@@ -158,7 +158,7 @@ func (s *Server) handleRequest(req *Request, conn conn) error {
 // handleConnect is used to handle a connect command
 func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) error {
 	// Check if this is allowed
-	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
+	if ctx_, ok := s.config.Rules.Allow(ctx, req, req.AuthContext); !ok {
 		if err := sendReply(conn, ruleFailure, nil); err != nil {
 			return fmt.Errorf("Failed to send reply: %v", err)
 		}
@@ -216,7 +216,7 @@ func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) err
 // handleBind is used to handle a connect command
 func (s *Server) handleBind(ctx context.Context, conn conn, req *Request) error {
 	// Check if this is allowed
-	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
+	if ctx_, ok := s.config.Rules.Allow(ctx, req, req.AuthContext); !ok {
 		if err := sendReply(conn, ruleFailure, nil); err != nil {
 			return fmt.Errorf("Failed to send reply: %v", err)
 		}
@@ -235,7 +235,7 @@ func (s *Server) handleBind(ctx context.Context, conn conn, req *Request) error 
 // handleAssociate is used to handle a connect command
 func (s *Server) handleAssociate(ctx context.Context, conn conn, req *Request) error {
 	// Check if this is allowed
-	if ctx_, ok := s.config.Rules.Allow(ctx, req); !ok {
+	if ctx_, ok := s.config.Rules.Allow(ctx, req, req.AuthContext); !ok {
 		if err := sendReply(conn, ruleFailure, nil); err != nil {
 			return fmt.Errorf("Failed to send reply: %v", err)
 		}
