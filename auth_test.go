@@ -49,7 +49,7 @@ func TestPasswordAuth_Valid(t *testing.T) {
 		t.Fatal("Invalid Context Method")
 	}
 
-	val, ok := ctx.Payload["Username"]
+	val, ok := ctx.Payload[PayloadUsername]
 	if !ok {
 		t.Fatal("Missing key Username in auth context's payload")
 	}
@@ -115,5 +115,25 @@ func TestNoSupportedAuth(t *testing.T) {
 	out := resp.Bytes()
 	if !bytes.Equal(out, []byte{socks5Version, noAcceptable}) {
 		t.Fatalf("bad: %v", out)
+	}
+}
+
+func TestAuthContext_Username(t *testing.T) {
+	if _, ok := (*AuthContext)(nil).Username(); ok {
+		t.Fatal("nil AuthContext must report no username")
+	}
+
+	noAuth := &AuthContext{Method: NoAuth}
+	if _, ok := noAuth.Username(); ok {
+		t.Fatal("auth context without payload must report no username")
+	}
+
+	withUser := &AuthContext{
+		Method:  UserPassAuth,
+		Payload: map[string]string{PayloadUsername: "foo"},
+	}
+	user, ok := withUser.Username()
+	if !ok || user != "foo" {
+		t.Fatalf("expected username foo, got %q (ok=%v)", user, ok)
 	}
 }

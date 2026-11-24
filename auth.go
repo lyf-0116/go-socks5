@@ -19,6 +19,10 @@ var (
 	NoSupportedAuth = fmt.Errorf("No supported authentication mechanism")
 )
 
+// PayloadUsername is the Payload key under which the authenticated
+// username is stored by UserPassAuthenticator.
+const PayloadUsername = "Username"
+
 // A Request encapsulates authentication state provided
 // during negotiation
 type AuthContext struct {
@@ -26,8 +30,19 @@ type AuthContext struct {
 	Method uint8
 	// Payload provided during negotiation.
 	// Keys depend on the used auth method.
-	// For UserPassauth contains Username
+	// For UserPassAuth contains the username under PayloadUsername.
 	Payload map[string]string
+}
+
+// Username returns the authenticated username and whether the auth
+// method provided one. It is the typed entry point rules should use
+// instead of indexing Payload with a string literal.
+func (a *AuthContext) Username() (string, bool) {
+	if a == nil || a.Payload == nil {
+		return "", false
+	}
+	username, ok := a.Payload[PayloadUsername]
+	return username, ok
 }
 
 type Authenticator interface {
@@ -106,7 +121,7 @@ func (a UserPassAuthenticator) Authenticate(reader io.Reader, writer io.Writer) 
 	}
 
 	// Done
-	return &AuthContext{UserPassAuth, map[string]string{"Username": string(user)}}, nil
+	return &AuthContext{UserPassAuth, map[string]string{PayloadUsername: string(user)}}, nil
 }
 
 // authenticate is used to handle connection authentication
