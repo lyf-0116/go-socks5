@@ -16,6 +16,12 @@ The package has the following features:
 * Custom DNS resolution
 * Unit tests
 
+Address rewrites are applied before the rules are evaluated, and the
+rewritten destination is what both the `RuleSet` sees and what the server
+dials. Rules therefore cannot be bypassed by a rewrite redirecting traffic
+into a different (e.g. internal) network; the originally requested address
+is retained in `Request.OriginalDestAddr` for auditing.
+
 TODO
 ====
 

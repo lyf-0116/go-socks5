@@ -35,7 +35,8 @@ type Config struct {
 	Rules RuleSet
 
 	// Rewriter can be used to transparently rewrite addresses.
-	// This is invoked before the RuleSet is invoked.
+	// This is invoked before the RuleSet is invoked, and the rewritten
+	// address is what the RuleSet evaluates and what gets dialed.
 	// Defaults to NoRewrite.
 	Rewriter AddressRewriter
 

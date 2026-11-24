@@ -37,6 +37,9 @@ var (
 
 // AddressRewriter is used to rewrite a destination transparently
 type AddressRewriter interface {
+	// Rewrite is invoked before the RuleSet. The returned AddrSpec
+	// replaces req.DestAddr, which means it is the exact address the
+	// rules evaluate and the address that is subsequently dialed.
 	Rewrite(ctx context.Context, request *Request) (context.Context, *AddrSpec)
 }
 
@@ -74,11 +77,16 @@ type Request struct {
 	AuthContext *AuthContext
 	// AddrSpec of the the network that sent the request
 	RemoteAddr *AddrSpec
-	// AddrSpec of the desired destination
+	// AddrSpec of the destination the client originally requested,
+	// before any AddressRewriter was applied. It is retained for
+	// auditing and logging and is never dialed directly.
+	OriginalDestAddr *AddrSpec
+	// AddrSpec of the effective destination. This starts as the
+	// requested destination and is replaced by the AddressRewriter
+	// result (if any) before the RuleSet runs, so the address the
+	// rules evaluate is always the address that will be dialed.
 	DestAddr *AddrSpec
-	// AddrSpec of the actual destination (might be affected by rewrite)
-	realDestAddr *AddrSpec
-	bufConn      io.Reader
+	bufConn  io.Reader
 }
 
 type conn interface {
@@ -133,10 +141,15 @@ func (s *Server) handleRequest(req *Request, conn conn) error {
 		dest.IP = addr
 	}
 
-	// Apply any address rewrites
-	req.realDestAddr = req.DestAddr
+	// Preserve the originally requested address for auditing, then
+	// apply any address rewrites. Rewriting must finish before the
+	// RuleSet is invoked, and the result is stored back into DestAddr
+	// so that the address the rules approve is the address that gets
+	// dialed: a rewrite must never be able to bypass the rules by
+	// diverging into another (e.g. internal) network.
+	req.OriginalDestAddr = req.DestAddr
 	if s.config.Rewriter != nil {
-		ctx, req.realDestAddr = s.config.Rewriter.Rewrite(ctx, req)
+		ctx, req.DestAddr = s.config.Rewriter.Rewrite(ctx, req)
 	}
 
 	// Switch on the command
@@ -174,7 +187,7 @@ func (s *Server) handleConnect(ctx context.Context, conn conn, req *Request) err
 			return net.Dial(net_, addr)
 		}
 	}
-	target, err := dial(ctx, "tcp", req.realDestAddr.Address())
+	target, err := dial(ctx, "tcp", req.DestAddr.Address())
 	if err != nil {
 		msg := err.Error()
 		resp := hostUnreachable
