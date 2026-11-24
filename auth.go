@@ -17,6 +17,7 @@ const (
 var (
 	UserAuthFailed  = fmt.Errorf("User authentication failed")
 	NoSupportedAuth = fmt.Errorf("No supported authentication mechanism")
+	InvalidAuth     = fmt.Errorf("Invalid authentication context")
 )
 
 // A Request encapsulates authentication state provided
@@ -117,16 +118,44 @@ func (s *Server) authenticate(conn io.Writer, bufConn io.Reader) (*AuthContext, 
 		return nil, fmt.Errorf("Failed to get auth methods: %v", err)
 	}
 
+	// Keep one view of the methods advertised by this server for the
+	// lifetime of this negotiation. This avoids validating the selected
+	// method against a differently-timed configuration snapshot.
+	advertisedMethods := make(map[uint8]Authenticator, len(s.authMethods))
+	for method, authenticator := range s.authMethods {
+		advertisedMethods[method] = authenticator
+	}
+
 	// Select a usable method
 	for _, method := range methods {
-		cator, found := s.authMethods[method]
+		cator, found := advertisedMethods[method]
 		if found {
-			return cator.Authenticate(bufConn, conn)
+			authContext, err := cator.Authenticate(bufConn, conn)
+			if err != nil {
+				return nil, err
+			}
+			if err := validateAuthContext(authContext, method, advertisedMethods); err != nil {
+				return nil, err
+			}
+			return authContext, nil
 		}
 	}
 
 	// No usable method found
 	return nil, noAcceptableAuth(conn)
+}
+
+func validateAuthContext(authContext *AuthContext, selectedMethod uint8, advertisedMethods map[uint8]Authenticator) error {
+	if authContext == nil {
+		return InvalidAuth
+	}
+
+	authenticator, advertised := advertisedMethods[authContext.Method]
+	if !advertised || authContext.Method != selectedMethod || authenticator == nil {
+		return InvalidAuth
+	}
+
+	return nil
 }
 
 // noAcceptableAuth is used to handle when we have no eligible
